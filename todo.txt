@@ -1,0 +1,59 @@
+TODO
+
+MVP:
+
+    Improve/create documentation
+    Fix clean command
+
+    Method to specify additional attributes
+
+    Correct include path handling
+        Right now package/include is passed directly as a
+        -Ipath/top/package/include
+
+        This is a problem if an include includes another header from the
+        current package, which is 
+        generally poor form, but sometimes necessary.
+
+
+        There are two ways to do this
+
+
+        per-packge include in a prefixed directory, so
+        including packge-a/stuff.h would be accomplished with
+        #include <package-a/stuff.h>
+            
+            include
+               |- packge-name
+                  |-packge-include.h
+
+        This might conflict with the 'standard' way where
+        all include files go in the same directory
+            include
+              |-packge-a-include.h
+              |-packge-b-include.h
+
+        The issue here is that we could have problems with namespacing, where
+        two packages have a common.h or similar
+
+        The current form of the package manager doesn't actually keep track of
+        which file are owned by which package when 'installing' (copying files
+        into the current package buing built), since the namespaces make it
+        unnecessary
+
+        So, is it better to do it the 'standard' way, and build out package
+        ownership of files, maybe getting into per-package ownership of files?
+
+        Or leave it as is, and maybe have some problems with third party
+        packages? I'm not sure if they will actually break
+
+
+Also important:
+
+    Ability to pull packages from gerrit.   
+
+        This probably means, try to get project-name from
+        gerrit/firmware/packages/project-name, and store 
+        in local git cache
+
+
