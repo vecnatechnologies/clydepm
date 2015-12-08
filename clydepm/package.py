@@ -38,7 +38,6 @@ class Package(object):
     print ("Creating new package")
     configs = [join(path, 'config.yaml'), join(path, 'descriptor.yaml')]
     for config in configs:
-      print config
       if os.path.exists(config):
         raise PackageError("Package already exists at {0}".format(path))
     # Create initial directory structure and config.yaml
@@ -463,22 +462,25 @@ class Package(object):
       compiler_prefix = ''
     # If any of the inputs are C++ files,
     # then the final links must be performed by g++, not gcc
-
+    
+    final_compiler = 'gcc'
     for source, object in stuff:
       if source.endswith('.c'):
         compiler = 'gcc'
       elif source.endswith('.cpp'):
         compiler = 'g++'
+        final_compiler = 'g++'
 
       if self.config['type'] == 'library':
-        args = [compiler_prefix + compiler] + cflags +  ['-c', '-o', object] + [source]
+        args = [compiler_prefix + compiler] + ['-c', '-o', object] + [source] + cflags
       elif self.config['type'] == 'application':
-        args = [compiler_prefix + compiler] + cflags +  ['-c', '-o', object] + [source]
+        args = [compiler_prefix + compiler] + ['-c', '-o', object] + [source] + cflags
       
       print "Compiling {0}".format(os.path.split(source)[1])
       print (colored(" ".join(args), 'yellow'))
       gcc = Popen(args, stdout=PIPE, stderr=PIPE)
       stdout, stderr = gcc.communicate()
+      print stdout
 
       if gcc.returncode != 0:
           raise CompilationError(stderr = stderr)
@@ -490,25 +492,29 @@ class Package(object):
                                                 'test'):
 
 
-      args = [compiler_prefix + 'gcc'] +  ['-o', self.binary] + cflags + sources + libraries
+      args = [compiler_prefix + final_compiler] +  ['-o', self.binary] + objects + libraries + cflags
 
       print colored(" ".join(args), 'yellow')
       gcc = Popen(args, stdout=PIPE, stderr=PIPE)
       stdout, stderr = gcc.communicate()
+
+      print stdout
 
       if gcc.returncode != 0:
           raise CompilationError(stderr = stderr)
 
     elif self.config['type'] == 'library':
       print (colored("Linking {0}".format(os.path.split(self.library)[1]),"red"))
-      args = [compiler_prefix + 'ar', '-rcs', self.library] + objects + libraries
+      args = [compiler_prefix + 'ld', '-r','-o', self.library] + objects + libraries
 
       print (colored(" ".join(args), 'yellow'))
       ar = Popen(args, stdout=PIPE, stderr=PIPE)
+      print stdout
       stdout, stderr = ar.communicate()
 
       if ar.returncode != 0:
         raise CompilationError(stderr = stderr)
+
     else:
       raise Exception("Clyde doesn't know how to build type: {0}".format(self.config['type']))
 

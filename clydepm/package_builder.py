@@ -54,7 +54,6 @@ class PackageBuilder(object):
   def __init__(self, configuration):
     package_root = configuration['General']['package-root']
     git_root     = configuration['General']['git-root']
-    foreign_root = '/other/firmware/foreign-packages'
 
     self.configuration = configuration
 
@@ -68,12 +67,8 @@ class PackageBuilder(object):
     else:
       self.local_git = LocalGitPackageServer(git_root)
 
-    if foreign_root is None:
-      self.foreign_server = LocalForeignPackagerServer(join(self.root_directory, 'foreign-packages'))
-    else:
-      self.foreign_server = LocalForeignPackagerServer(foreign_root)
 
-    self.package_servers = [self.local_git, self.foreign_server]
+    self.package_servers = [self.local_git]
 
     self.package_directory = join(self.root_directory, '.packages')
 
@@ -156,6 +151,7 @@ class PackageBuilder(object):
 
     if descriptor['version'] == 'local':
       package_path = descriptor['local-path']
+      descriptor['form'] = 'source'
     else:
       hash = stable_sha(descriptor)  
       package_path = join(self.package_directory, hash)
@@ -199,7 +195,7 @@ class PackageBuilder(object):
     
     """
     packages = []
-    parent_descriptor['dependencies'] = package.get_dependency_configurations()
+    parent_descriptor['requires'] = package.get_dependency_configurations()
     for dep_name, dep_config in package.get_dependency_configurations().iteritems():
       
       descriptor = self.make_package_descriptor(package, parent_descriptor,
@@ -215,16 +211,17 @@ class PackageBuilder(object):
         del traits['variant']
     descriptor = {
       'name'          : dep_name,
-      'version'       : parent_descriptor['dependencies'][dep_name]['version'],
+      'version'       : parent_descriptor['requires'][dep_name]['version'],
       'form'          : 'binary',
       'traits'        : traits
     }
 
     if descriptor['version'] == 'local':
-      local_path = parent_descriptor['dependencies'][dep_name]['local-path']
+      local_path = parent_descriptor['requires'][dep_name]['local-path']
       #local_path = realpath(join(package.get_path(), local_path))
       descriptor['local-path'] = local_path
     descriptor['traits']['cflags'] = parent_descriptor['traits']['cflags']
+    print "pt", parent_descriptor
     # Copy all the elements from the dep_config
     # into the descriptor (name, version, local-path, base-version)
     return descriptor

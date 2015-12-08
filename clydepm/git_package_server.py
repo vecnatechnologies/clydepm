@@ -34,6 +34,13 @@ class PackageServer(object):
     self.git_directory     = realpath(join(self.root_directory, 'git'))
     self.package_directory = realpath(join(self.root_directory, 'packages'))
 
+    to_create = [self.git_directory, self.package_directory]
+
+    for d in to_create:
+        if not os.path.exists(d):
+            print("Creating {0}".format(d))
+            os.makedirs(d)
+
 
   def make_tarfile(self, output_filename, source_dir, base='./'):
     """
@@ -87,6 +94,7 @@ class LocalGitPackageServer(PackageServer):
       if git.returncode == 0:
         return True
       return False
+
   def checkout_remote_project(self, project_name):
     username = getpass.getuser()
     base_url = 'ssh://{0}@git.crl.vecna.com:29418/clyde/packages/{1}'.format(username,
@@ -139,8 +147,7 @@ class LocalForeignPackagerServer(PackageServer):
     PackageServer.__init__(self, root_directory)
     
     self.foreign_package_directory = self.package_directory
-    self.package_directory = join(self.root_directory, 'compiled-packages')
-
+    self.package_directory = join(self.root_directory, 'compiled-packages') 
 
   def foreign_build(self, path, descriptor):
     package = Package(path, form = 'source', traits = descriptor['traits']) 
@@ -184,6 +191,8 @@ class LocalForeignPackagerServer(PackageServer):
     if descriptor['form'] != 'binary':
         return None
     hash = stable_sha(descriptor)
+    if not os.path.exists(self.foreign_package_directory):
+        return None
     package_paths = [d for d in os.listdir(self.foreign_package_directory) ]
     name = descriptor['name']
 
