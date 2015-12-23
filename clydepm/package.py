@@ -10,7 +10,7 @@ from distutils.dir_util import copy_tree
 import distutils
 from termcolor import colored
 
-from common import temp_cwd, dict_contains
+from .common import temp_cwd, dict_contains
 
 class CompilationError(Exception):
 
@@ -210,17 +210,17 @@ class Package(object):
     
     for variant in variants:
       assert len(variant) == 1
-      for name, details in  variant.iteritems():
+      for name, details in  variant.items():
         if 'when' in details:
           enabled = evaluate_clause(details['when'])
           if enabled:
-            print "enabled"
+            print("enabled")
             process_effects(name, details)
     self.variant_dirs = {}
     for variant_name in enabled_variants:
       self.variant_dirs[variant_name] =  join(self.path, variant_name)
 
-    self.filtered_variants = filter(lambda a: a.keys()[0] in enabled_variants, self.get_variants())
+    self.filtered_variants = [a for a in self.get_variants() if list(a.keys())[0] in enabled_variants]
     return self.filtered_variants
 
   def get_hash(self, method = 'timestamp'):
@@ -251,7 +251,7 @@ class Package(object):
     self.library = join( self.output_dirs['lib'], 'lib' + self.name + '-' + version_string + '.a')
     self.binary =  join( self.output_dirs['bin'], self.name + '-' + version_string + '.out')
 
-    for key, dir in self.output_dirs.iteritems():
+    for key, dir in self.output_dirs.items():
       if not os.path.exists(dir):
         os.makedirs(dir)
 
@@ -286,7 +286,7 @@ class Package(object):
     for dep_name in self.get_dependency_configurations():
       d = join(self.dependency_dir, dep_name)
       for root, dirs, filenames in os.walk(d):
-        filenames = filter(lambda a: a.endswith(".a"), filenames)
+        filenames = [a for a in filenames if a.endswith(".a")]
         libs.extend([join(root, f) for f in filenames])
     return libs
 
@@ -354,10 +354,10 @@ class Package(object):
       # Note: the variants have already been resolved
       # This for loop simply needs to resolve the dependencies one
       # by one, potentially overwriding earlier ones
-      name, value = variant.iteritems().next()
+      name, value = next(iter(variant.items()))
       if 'requires' in value and value['requires'] is not None:
         requires = value['requires']
-        for req_name, req_config in requires.iteritems():
+        for req_name, req_config in requires.items():
           deps[req_name] = req_config
 
     return deps
@@ -373,13 +373,13 @@ class Package(object):
     log = join(self.path, 'build_output.txt')
     with temp_cwd(self.path):
       if os.path.exists(build_script):
-        print "Running build.sh"
+        print("Running build.sh")
         os.environ['CFLAGS']  + self.traits['cflags']
-        print 'CFLAGS', self.traits['cflags']
+        print('CFLAGS', self.traits['cflags'])
         os.environ['VERSION'] = self.config['version']
         del os.environ['CC']
 
-        print "VERSION=", self.config['version']
+        print("VERSION=", self.config['version'])
         args = [build_script]
         bash = Popen(args, stdout=PIPE, stderr=PIPE)
         stdout, stderr = bash.communicate()
@@ -387,7 +387,7 @@ class Package(object):
         del os.environ['VERSION']
 
         with open(log, 'w') as f:
-          print "Writing to {0}".format(log)
+          print("Writing to {0}".format(log))
           f.write(stdout)
 
         if bash.returncode !=0:
@@ -429,7 +429,7 @@ class Package(object):
 
 
     for variant in self.filtered_variants:
-      variant_name = variant.keys()[0]
+      variant_name = list(variant.keys())[0]
       variant_dir = self.variant_dirs[variant_name]
 
       # List out sources without full paths so we can create a list of object files
@@ -451,7 +451,7 @@ class Package(object):
       sources.extend(new_sources)
       objects.extend(new_objects)
 
-    stuff = zip(sources, objects)
+    stuff = list(zip(sources, objects))
     cflags = self.create_cflags()
     cflags.extend(extra_flags.split())
 
@@ -476,11 +476,11 @@ class Package(object):
       elif self.config['type'] == 'application':
         args = [compiler_prefix + compiler] + ['-c', '-o', object] + [source] + cflags
       
-      print "Compiling {0}".format(os.path.split(source)[1])
-      print (colored(" ".join(args), 'yellow'))
+      print("Compiling {0}".format(os.path.split(source)[1]))
+      print((colored(" ".join(args), 'yellow')))
       gcc = Popen(args, stdout=PIPE, stderr=PIPE)
       stdout, stderr = gcc.communicate()
-      print stdout
+      print(stdout)
 
       if gcc.returncode != 0:
           raise CompilationError(stderr = stderr)
@@ -494,22 +494,22 @@ class Package(object):
 
       args = [compiler_prefix + final_compiler] +  ['-o', self.binary] + objects + libraries + cflags
 
-      print colored(" ".join(args), 'yellow')
+      print(colored(" ".join(args), 'yellow'))
       gcc = Popen(args, stdout=PIPE, stderr=PIPE)
       stdout, stderr = gcc.communicate()
 
-      print stdout
+      print(stdout)
 
       if gcc.returncode != 0:
           raise CompilationError(stderr = stderr)
 
     elif self.config['type'] == 'library':
-      print (colored("Linking {0}".format(os.path.split(self.library)[1]),"red"))
+      print((colored("Linking {0}".format(os.path.split(self.library)[1]),"red")))
       args = [compiler_prefix + 'ld', '-r','-o', self.library] + objects + libraries
 
-      print (colored(" ".join(args), 'yellow'))
+      print((colored(" ".join(args), 'yellow')))
       ar = Popen(args, stdout=PIPE, stderr=PIPE)
-      print stdout
+      print(stdout)
       stdout, stderr = ar.communicate()
 
       if ar.returncode != 0:

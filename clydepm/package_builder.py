@@ -1,11 +1,11 @@
-from package import Package
+from .package import Package
 import os
 import hashlib
 import shutil
 import yaml
 from os.path import splitext, join, realpath
-from common import stable_sha
-from git_package_server import LocalGitPackageServer, LocalForeignPackagerServer
+from .common import stable_sha
+from .git_package_server import LocalGitPackageServer, LocalForeignPackagerServer
 import tarfile
 from distutils.dir_util import copy_tree
 import pprint
@@ -140,8 +140,8 @@ class PackageBuilder(object):
           if package_tarball_path is None:
             raise Exception("Failed to find package {0} anywhere".format(name))
       else:
-        print ("Found {0} sources locally".format(name + '-' +
-                                                 descriptor['version']))
+        print(("Found {0} sources locally".format(name + '-' +
+                                                 descriptor['version'])))
 
     else:
       pass
@@ -170,15 +170,15 @@ class PackageBuilder(object):
         for d in dependencies:
           d.copy_artifacts(package.get_dependency_dir())
         
-        print ("Building {0}-{1}".format(package.config['name'],
-                                       package.config['version']))
+        print(("Building {0}-{1}".format(package.config['name'],
+                                       package.config['version'])))
         package.build()
         descriptor['form'] = package.get_form()
         package.create_archive(descriptor)
         self.store_package(package, descriptor)
       elif form =='binary':
-        print ("Package {0}-{1} already built".format(descriptor['name'],
-                                                      descriptor['version']))
+        print(("Package {0}-{1} already built".format(descriptor['name'],
+                                                      descriptor['version'])))
 
 
 
@@ -196,7 +196,7 @@ class PackageBuilder(object):
     """
     packages = []
     parent_descriptor['requires'] = package.get_dependency_configurations()
-    for dep_name, dep_config in package.get_dependency_configurations().iteritems():
+    for dep_name, dep_config in package.get_dependency_configurations().items():
       
       descriptor = self.make_package_descriptor(package, parent_descriptor,
                                                 dep_name)
@@ -221,7 +221,7 @@ class PackageBuilder(object):
       #local_path = realpath(join(package.get_path(), local_path))
       descriptor['local-path'] = local_path
     descriptor['traits']['cflags'] = parent_descriptor['traits']['cflags']
-    print "pt", parent_descriptor
+    print("pt", parent_descriptor)
     # Copy all the elements from the dep_config
     # into the descriptor (name, version, local-path, base-version)
     return descriptor

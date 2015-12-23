@@ -1,9 +1,9 @@
-from common import stable_sha, temp_cwd
+from .common import stable_sha, temp_cwd
 from os.path import splitext, join, realpath
 import os
 import tarfile
 from git import Repo
-from package import Package
+from .package import Package
 from subprocess import Popen, PIPE
 import getpass
 from termcolor import colored
@@ -38,7 +38,7 @@ class PackageServer(object):
 
     for d in to_create:
         if not os.path.exists(d):
-            print("Creating {0}".format(d))
+            print(("Creating {0}".format(d)))
             os.makedirs(d)
 
 
@@ -99,7 +99,7 @@ class LocalGitPackageServer(PackageServer):
     username = getpass.getuser()
     base_url = 'ssh://{0}@git.crl.vecna.com:29418/clyde/packages/{1}'.format(username,
                                                                   project_name)
-    print (colored('Checking out {0}'.format(base_url),'green'))
+    print((colored('Checking out {0}'.format(base_url),'green')))
     return self.checkout_remote_repo(base_url)
 
   def get_package_tarball_by_descriptor(self, descriptor):

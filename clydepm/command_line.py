@@ -1,13 +1,13 @@
 #!/usr/bin/env python
-from package_builder import PackageBuilder
-from package import Package
+from .package_builder import PackageBuilder
+from .package import Package
 import argparse
 from os.path import realpath, join, exists, expanduser
 from os import getcwd
 import os
 from subprocess import Popen, PIPE
 import pkg_resources
-import ConfigParser
+import configparser
 import getpass
 
 from colorama import init
@@ -54,13 +54,13 @@ def load_config(exec_root):
 
   for config_path in config_paths:
     if exists(config_path):
-      print 'Loading {0}'.format(config_path)
-      config_parser = ConfigParser.ConfigParser()
+      print('Loading {0}'.format(config_path))
+      config_parser = configparser.ConfigParser()
       config_parser.readfp(open(config_path))
 
-      for section, options in config.iteritems():
+      for section, options in config.items():
         if config_parser.has_section(section):
-          for option, value in options.iteritems():
+          for option, value in options.items():
               if config_parser.has_option(section, option):
                 config[section][option] = config_parser.get(section, option)
   return config
@@ -156,11 +156,11 @@ def run_binary(binary):
     args = [binary]
     test_binary = Popen(args, stdout=PIPE, stderr=PIPE)
     stdout, stderr = test_binary.communicate()
-    print "Running test executable"
+    print("Running test executable")
     print (stdout)
-    print (colored(stderr, 'red'))
+    print((colored(stderr, 'red')))
   else:
-    print (colored('Failed to run. Test executable is missing.', 'red'))
+    print((colored('Failed to run. Test executable is missing.', 'red')))
 
 def run(builder):
   package = make(builder)
@@ -169,18 +169,18 @@ def run(builder):
 
 
 def test(builder):
-  print 'Testing'
+  print('Testing')
   package = make(builder, variant = 'test')
   binary = package.get_binary()
   run_binary(binary)
 
 def init(builder, package_type = 'application'):
-  print 'initializing'
+  print('initializing')
   builder.create_new_package(os.getcwd(), package_type)
   pass
 
 def config(builder):
-  print 'configuring'
+  print('configuring')
   pass
 
 def version():
