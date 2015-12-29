@@ -10,7 +10,7 @@ from distutils.dir_util import copy_tree
 import distutils
 from termcolor import colored
 
-from .common import temp_cwd, dict_contains
+from .common import temp_cwd, dict_contains, stable_sha 
 
 class CompilationError(Exception):
 
@@ -18,8 +18,10 @@ class CompilationError(Exception):
         self.stderr = stderr
         Exception.__init__(self)
 
+    def __repr__(self):
+      return u"Compilation Failed\n\n\t" + self.stderr.decode("utf-8")
     def __str__(self):
-      return "Compilation Failed" + "\n\n" + self.stderr
+      return "Compilation Error: \n\n" + self.stderr.decode("utf-8")
 
 class PackageError(Exception):
 
@@ -29,6 +31,9 @@ class PackageError(Exception):
 
     def __str__(self):
       return self.error
+
+    def __repr__(self):
+        return self.__str__()
 
 
 class Package(object):
@@ -305,24 +310,35 @@ class Package(object):
     return library_paths
 
   def create_cflags(self):
-      cflags = self.traits['cflags'].split()
-      if 'cflags' in self.config and 'gcc' in self.config['cflags']:
-          cflags += self.config['cflags']['gcc'].split() 
+    cflags = self.traits['cflags'].split()
+    if 'cflags' in self.config and 'gcc' in self.config['cflags']:
+      cflags += self.config['cflags']['gcc'].split() 
 
-      for path in self.get_include_paths():
-        cflags.append('-I' + path)
+    for path in self.get_include_paths():
+      cflags.append('-I' + path)
 
-      return cflags
+    return cflags
 
-  def copy_artifacts(self, dest):
+
+  def copy_artifacts(self, dest, headers_only = False):
     src = realpath(join(self.output_dir))
     # Scary magic that occurs because shutil
     # has a cache of directories that where created,
     # so it doesn't recreate the directory structure
     # See:
     # http://stackoverflow.com/questions/9160227/dir-util-copy-tree-fails-after-shutil-rmtree
+
+    def filter_not_headers(f, g):
+      return ['lib', 'bin']
+
     distutils.dir_util._path_created = {}
-    copy_tree(src, dest, verbose=True)
+    if headers_only:
+      src = join(realpath(join(self.output_dir)), self.name)
+      dest = join(dest, self.name)
+      shutil.rmtree(dest)
+      shutil.copytree(src, dest, ignore = filter_not_headers)
+    else:
+      copy_tree(src, dest)
 
 
 
@@ -333,6 +349,7 @@ class Package(object):
     #for header in headers:
     #  dest = join(self.output_dirs['include'])
     #  shutil.copy2(header, dest)
+
 
   def get_dependency_configurations(self):
     """
@@ -413,8 +430,11 @@ class Package(object):
       self.form = 'binary'
       return self.foreign_build()
 
-
-    self.compile(extra_flags)
+    try:
+      self.compile(extra_flags)
+    except CompilationError as e:
+      #print (str(e))
+      raise e
     self.copy_headers()
     self.form = 'binary'
 
@@ -520,6 +540,13 @@ class Package(object):
 
   def __repr__(self):
     return "Package('{0}')".format(self.path)
+
+  def __hash__(self):
+      h = int(stable_sha(self.config), 16)
+      return h
+
+  def __eq__(self, other):
+    return hash(self) == hash(other)
 
 
 if __name__ == '__main__':

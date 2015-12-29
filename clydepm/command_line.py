@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from .package_builder import PackageBuilder
-from .package import Package
+from .package import Package, CompilationError
 import argparse
 from os.path import realpath, join, exists, expanduser
 from os import getcwd
@@ -142,7 +142,11 @@ def make(builder, variant = 'src'):
     raise Exception("This isn't a package {0}".format(project_root))
   descriptor = make_package_descriptor(project_root, variant)
 
-  return builder.get_package_by_descriptor(descriptor)
+  try:
+      package = builder.get_package_by_descriptor(descriptor)
+  except CompilationError as e:
+    print (str(e))
+  return package
 
 
 def clean(builder):

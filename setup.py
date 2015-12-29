@@ -19,7 +19,7 @@ options = {
                              'termcolor', 
                             ],
     'zip_safe'          :   False,
-    'version'           :   '0.0.16',
+    'version'           :   '0.0.17',
     'test_suite'        :   'nose.collector',
     'tests_require'     :   ['nose'],
     'entry_points'      :   {

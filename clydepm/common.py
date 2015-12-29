@@ -1,4 +1,6 @@
 import hashlib, os, sys
+from os.path import join
+from distutils.dir_util import copy_tree
 
 def stable_sha(data):
   """
@@ -9,12 +11,14 @@ def stable_sha(data):
   and hashses of the contents are appended, and then hashed 
   again
   """
+  hash = ""
   if isinstance(data, dict):
     sorted_data = sorted(data.items())
-    hash = ""
     for k, v in sorted_data:
       hash += stable_sha(v) + "\n"
     return hashlib.sha1(hash.encode('utf-8')).hexdigest()
+  elif isinstance(data, bytes):
+    return hashlib.sha1(data).hexdigest()
   elif isinstance(data, str):
     return hashlib.sha1(data.encode('utf-8')).hexdigest()
   elif isinstance(data, list):
@@ -60,4 +64,11 @@ class temp_cwd(object):
 
 def dict_contains(superset, subset):
   return all(item in list(superset.items()) for item in list(subset.items()))
-  
+
+def list_contains(list, d):
+  for item in list:
+    if dict_contains(item, d):
+      return True
+  return False
+
+

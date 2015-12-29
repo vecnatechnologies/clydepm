@@ -4,7 +4,7 @@ import hashlib
 import shutil
 import yaml
 from os.path import splitext, join, realpath
-from .common import stable_sha
+from .common import stable_sha, list_contains
 from .git_package_server import LocalGitPackageServer, LocalForeignPackagerServer
 import tarfile
 from distutils.dir_util import copy_tree
@@ -67,6 +67,8 @@ class PackageBuilder(object):
     else:
       self.local_git = LocalGitPackageServer(git_root)
 
+    self.all_deps = set()
+
 
     self.package_servers = [self.local_git]
 
@@ -113,6 +115,7 @@ class PackageBuilder(object):
 
     """
     hash = stable_sha(descriptor)
+    all_dependencies = []
     # packages are stored in root/.packages/
 
 
@@ -159,7 +162,6 @@ class PackageBuilder(object):
     package = Package(package_path, descriptor['form'], descriptor['traits'])
 
 
-
     if package:
       form = descriptor['form']
         
@@ -168,7 +170,12 @@ class PackageBuilder(object):
         parent_descriptor = descriptor.copy()
         dependencies = self.get_package_dependencies(package, parent_descriptor) 
         for d in dependencies:
-          d.copy_artifacts(package.get_dependency_dir())
+          if not self.dep_satisfied(d):
+            d.copy_artifacts(package.get_dependency_dir(), False)
+            self.all_deps.add(d)
+          else:
+            print ("Already have {0}. Copying headers only".format(d.name))
+            d.copy_artifacts(package.get_dependency_dir(), True)
         
         print(("Building {0}-{1}".format(package.config['name'],
                                        package.config['version'])))
@@ -177,7 +184,7 @@ class PackageBuilder(object):
         package.create_archive(descriptor)
         self.store_package(package, descriptor)
       elif form =='binary':
-        print(("Package {0}-{1} already built".format(descriptor['name'],
+        print(("Package {0}-{1} already built".format(descriptor,
                                                       descriptor['version'])))
 
 
@@ -200,6 +207,7 @@ class PackageBuilder(object):
       
       descriptor = self.make_package_descriptor(package, parent_descriptor,
                                                 dep_name)
+
       package = self.get_package_by_descriptor(descriptor)
       packages.append(package)
     return packages
@@ -221,13 +229,16 @@ class PackageBuilder(object):
       #local_path = realpath(join(package.get_path(), local_path))
       descriptor['local-path'] = local_path
     descriptor['traits']['cflags'] = parent_descriptor['traits']['cflags']
-    print("pt", parent_descriptor)
+    #print("pt", parent_descriptor)
     # Copy all the elements from the dep_config
     # into the descriptor (name, version, local-path, base-version)
     return descriptor
 
 
-
+  def dep_satisfied(self, new_dep):
+    if new_dep in self.all_deps:
+      return True
+    return False
 
   def build_package_by_description(self, descriptor):
     pass

@@ -96,7 +96,7 @@ class LocalGitPackageServer(PackageServer):
       return False
 
   def checkout_remote_project(self, project_name):
-    username = getpass.getuser()
+    username = 'isaac.gutekunst'
     base_url = 'ssh://{0}@git.crl.vecna.com:29418/clyde/packages/{1}'.format(username,
                                                                   project_name)
     print((colored('Checking out {0}'.format(base_url),'green')))
