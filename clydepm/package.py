@@ -529,8 +529,8 @@ class Package(object):
 
       print((colored(" ".join(args), 'yellow')))
       ar = Popen(args, stdout=PIPE, stderr=PIPE)
-      print(stdout)
       stdout, stderr = ar.communicate()
+      print(stdout)
 
       if ar.returncode != 0:
         raise CompilationError(stderr = stderr)
