@@ -1,0 +1,39 @@
+# All clyde templates are initially configured 
+# in this file.
+templates:
+    # Sphinx and doxygen generation files
+    - docs:
+        directory: docs
+        include:
+            - index.rst
+            - Makefile.sphinx: {as: Makefile}
+            - conf.py
+            - doxyfile
+     
+    # Gitignore file
+    - gitignore:
+        directory: $PWD
+        include:
+            - gitignore: {as: .gitignore}
+ 
+    # YouCompleteMe VIM autocomplete templates
+    - ycm:
+        directory: $PWD
+        include:
+            - ycm_extra_conf.py {as: .ycm_extra_conf.py}
+     
+    # Empty test skeleton
+    - empty-test:
+        message: Please update your config.yaml to add a test variant
+        variants:
+        directory: test
+        include:
+            - cpputest-empty.cpp {as: main.cpp}
+ 
+    # Template package group
+    - default:
+        meta-include:
+            - docs
+            - gitignore
+            - ycm
+            - empty-test

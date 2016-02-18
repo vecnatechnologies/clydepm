@@ -7,6 +7,7 @@ from .package import Package
 from subprocess import Popen, PIPE
 import getpass
 from termcolor import colored
+import shutil
 
 class PackageServer(object):
   """
@@ -41,6 +42,10 @@ class PackageServer(object):
             print(("Creating {0}".format(d)))
             os.makedirs(d)
 
+  def flush(self):
+    print ("\tDeleting {0}".format( self.package_directory))
+    if os.path.exists(self.package_directory):
+        shutil.rmtree(self.package_directory)
 
   def make_tarfile(self, output_filename, source_dir, base='./'):
     """
@@ -78,7 +83,7 @@ class LocalGitPackageServer(PackageServer):
 
   def checkout_tag(self, repo, spec):
     
-    commit = repo.commit(spec)
+    commit = repo.create_head('master')
     if commit:
       repo.head.reference = commit
       repo.head.reset(index = True, working_tree=True)
@@ -96,7 +101,9 @@ class LocalGitPackageServer(PackageServer):
       return False
 
   def checkout_remote_project(self, project_name):
-    username = 'isaac.gutekunst'
+    username = username = getpass.getuser()
+    if username == 'igutek':
+        username = "isaac.gutekunst"
     base_url = 'ssh://{0}@git.crl.vecna.com:29418/clyde/packages/{1}'.format(username,
                                                                   project_name)
     print((colored('Checking out {0}'.format(base_url),'green')))

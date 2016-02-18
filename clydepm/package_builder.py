@@ -1,5 +1,6 @@
-from .package import Package
+from .package import Package, EmptyPackage
 import os
+import sys
 import hashlib
 import shutil
 import yaml
@@ -9,6 +10,7 @@ from .git_package_server import LocalGitPackageServer, LocalForeignPackagerServe
 import tarfile
 from distutils.dir_util import copy_tree
 import pprint
+from graphviz import Digraph
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -52,6 +54,15 @@ class PackageBuilder(object):
 
   """
   def __init__(self, configuration):
+    self.u = Digraph('unix', filename='build.gv')
+    self.counter = 1
+    self.u.body.append('size="6,6"')
+    self.u.node_attr.update(color='lightblue2', style='filled')
+
+
+    self.root_package = None
+
+    self.build_trace = []
     package_root = configuration['General']['package-root']
     git_root     = configuration['General']['git-root']
 
@@ -74,6 +85,9 @@ class PackageBuilder(object):
 
     self.package_directory = join(self.root_directory, '.packages')
 
+    if not os.path.exists(self.package_directory):
+      os.makedirs(self.package_directory)
+
   def store_tarball(self, tarball_path):
     """
     Extract and store a tarball in local cache
@@ -86,6 +100,17 @@ class PackageBuilder(object):
         tar.extractall(self.package_directory)
     else:
       raise Exception("store_tarball not passed .tar.gz file")
+
+  def flush(self):
+    print ("Deleting local cache first")
+    print ("\tDeleting {0}".format(self.package_directory))
+   
+    if os.path.exists(self.package_directory):
+        shutil.rmtree(self.package_directory)
+    
+    print ("Deleting all upstream caches")
+    for server in self.package_servers:
+        server.flush()
     
   def create_new_package(self, new_package_directory, package_type):
 
@@ -94,7 +119,16 @@ class PackageBuilder(object):
                                self.configuration)
   
   def store_package(self, package, descriptor):
-    path  = join(self.package_directory, stable_sha(descriptor))
+    descriptor_for_hashing = descriptor.copy()
+  
+    #TODO
+    # Think whether htis is a hack.
+    # When you build a package, you don't want to have to 
+    # enumerate it's dependencies, but you want to know what 
+    # they are when linking to abvoid multiple definitions
+    if 'dependencies' in descriptor_for_hashing:
+      del descriptor_for_hashing['dependencies']
+    path  = join(self.package_directory, stable_sha(descriptor_for_hashing))
 
     if os.path.exists(path):
       print ("Overwriting existing package!")
@@ -105,7 +139,7 @@ class PackageBuilder(object):
 
 
 
-  def get_package_by_descriptor(self, descriptor):
+  def get_package_by_descriptor(self, descriptor, clean = False):
     """
     Given a python dictionary describing a package, retrieve 
     it using whatever techniques are necessary.
@@ -114,6 +148,8 @@ class PackageBuilder(object):
     retrieving all the dependencies
 
     """
+    self.build_trace.append(descriptor['name'])
+    
     hash = stable_sha(descriptor)
     all_dependencies = []
     # packages are stored in root/.packages/
@@ -159,9 +195,15 @@ class PackageBuilder(object):
       hash = stable_sha(descriptor)  
       package_path = join(self.package_directory, hash)
 
-    package = Package(package_path, descriptor['form'], descriptor['traits'])
+    package = Package(package_path, descriptor['form'], descriptor['traits'],
+                      self.root_package)
 
+    if self.root_package is None:
+      self.root_package = package
 
+    if clean:
+        package.clean()
+        return
     if package:
       form = descriptor['form']
         
@@ -171,24 +213,47 @@ class PackageBuilder(object):
         dependencies = self.get_package_dependencies(package, parent_descriptor) 
         for d in dependencies:
           if not self.dep_satisfied(d):
-            d.copy_artifacts(package.get_dependency_dir(), False)
+            self.u.edge(str(package), str(d), label = str(self.counter))
+            self.counter += 1
+            d.copy_artifacts(self.root_package.get_dependency_dir(), False)
             self.all_deps.add(d)
           else:
-            print ("Already have {0}. Copying headers only".format(d.name))
-            d.copy_artifacts(package.get_dependency_dir(), True)
+            package.ignore_dependency_by_name(d.name)
+            pass
+            #e = self.u.edge(str(package), str(d), color="orange", label =
+            #               str(self.counter))
+            #self.counter +=1
+            #print ("Already have {0}. Copying headers only".format(d.name))
+            #d.copy_artifacts(package.get_dependency_dir(), True)
         
         print(("Building {0}-{1}".format(package.config['name'],
                                        package.config['version'])))
+        package.copy_artifacts(self.root_package.get_dependency_dir(), True)
         package.build()
         descriptor['form'] = package.get_form()
+        descriptor['dependencies'] = package.get_dependency_configurations()
         package.create_archive(descriptor)
         self.store_package(package, descriptor)
+
       elif form =='binary':
-        print(("Package {0}-{1} already built".format(descriptor,
+        print(("Package {0}-{1} already built".format(descriptor['name'],
                                                       descriptor['version'])))
 
+        package.copy_artifacts(self.root_package.get_dependency_dir(), True)
+
+        if 'dependencies' in package.config:
+          for name, options in package.config['dependencies'].items():
+            d = EmptyPackage(name, options['version'])
+            if not self.dep_satisfied(d):
+              self.all_deps.add(d)
+              e = self.u.edge(str(package), str(d), color="red", label =
+                              str(self.counter))
+              self.counter += 1
+            else:
+              e = self.u.edge(str(package), str(d), color="orange", label = str(self.counter))
 
 
+      self.build_trace.pop()
       return package
          
     else:
@@ -225,7 +290,10 @@ class PackageBuilder(object):
     }
 
     if descriptor['version'] == 'local':
-      local_path = parent_descriptor['requires'][dep_name]['local-path']
+      try:
+        local_path = parent_descriptor['requires'][dep_name]['local-path']
+      except KeyError as k:
+        raise Exception("Please add a local-path option for all local dependencies")
       #local_path = realpath(join(package.get_path(), local_path))
       descriptor['local-path'] = local_path
     descriptor['traits']['cflags'] = parent_descriptor['traits']['cflags']

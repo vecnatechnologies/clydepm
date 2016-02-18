@@ -19,9 +19,10 @@ class CompilationError(Exception):
         Exception.__init__(self)
 
     def __repr__(self):
-      return u"Compilation Failed\n\n\t" + self.stderr.decode("utf-8")
+      return u"Compilation Failed\n\n\t" + str(self.stderr.decode("utf-8"))
+
     def __str__(self):
-      return "Compilation Error: \n\n" + self.stderr.decode("utf-8")
+      return "Compilation Error: \n\n" + str(self.stderr.decode('utf-8'))
 
 class PackageError(Exception):
 
@@ -34,6 +35,22 @@ class PackageError(Exception):
 
     def __repr__(self):
         return self.__str__()
+
+class EmptyPackage(object):
+
+  def __init__(self, name, version):
+      self.name = name
+      self.version = version
+
+  def __hash__(self):
+      h = int(stable_sha({'name': self.name, 
+                         }), 16)
+      return h
+  def __repr__(self):
+    return "{0}-{1}".format(self.name, self.version)
+
+  def __eq__(self, other):
+    return hash(self) == hash(other)
 
 
 class Package(object):
@@ -77,8 +94,13 @@ class Package(object):
       f.write(yaml.dump(package_config))
       
 
-  def __init__(self, path, form = 'binary', traits = None):
+  def __init__(self, 
+               path, 
+               form = 'binary', 
+               traits = None, 
+               root_package = None):
 
+    self.config = None
     # TODO: Clean up multiple types of config files
     if not os.path.exists(path):
       raise Exception("Attempting to use nonexistant path {0} as Package".format(path))
@@ -96,9 +118,11 @@ class Package(object):
             break
         else:
           pass
-          #print "Could not find {0}".format(config_file)
+      if not self.config:
+        raise PackageError("No package (missing config.yaml) at {0}".format(path))
+
     except IOError as io:
-      raise PackageError("No package at {0}".format(path))
+      raise PackageError("No package (missing config.yaml) at {0}".format(path))
     
 
     if traits is  None:
@@ -110,6 +134,10 @@ class Package(object):
 
     self.name         = self.config['name']
     self.include      = realpath(join(self.path, 'include'))
+    self.private_include = realpath(join(self.path, 'private_include'))
+
+    self.root_package = root_package
+    self.ignored_deps = []
 
     self.build_dir =    realpath(join(path,      'build'))
     self.archive_dir =  realpath(join(path,      'archive'))
@@ -219,7 +247,6 @@ class Package(object):
         if 'when' in details:
           enabled = evaluate_clause(details['when'])
           if enabled:
-            print("enabled")
             process_effects(name, details)
     self.variant_dirs = {}
     for variant_name in enabled_variants:
@@ -247,9 +274,9 @@ class Package(object):
     if not os.path.exists(self.build_dir):
       os.mkdir(self.build_dir)
 
-    self.output_dirs['include'] = join(self.output_dir, self.name, 'include', self.name)
-    self.output_dirs['lib']     = join(self.output_dir, self.name, 'lib', self.name)
-    self.output_dirs['bin']     = join(self.output_dir, self.name, 'bin', self.name     )
+    self.output_dirs['include'] = join(self.output_dir,  'include', self.name)
+    self.output_dirs['lib']     = join(self.output_dir,  'lib', self.name)
+    self.output_dirs['bin']     = join(self.output_dir,  'bin', self.name)
 
     version_string = self.config['version']
 
@@ -271,6 +298,8 @@ class Package(object):
     if os.path.exists(self.output_dir):
       shutil.rmtree(self.output_dir)
 
+    if os.path.exists(self.archive_dir):
+      shutil.rmtree(self.archive_dir)
 
   def get_form(self):
     return self.form
@@ -285,20 +314,39 @@ class Package(object):
     return f + new_extension
 
 
+  def ignore_dependency_by_name(self, dep):
+    self.ignored_deps.append(dep)
+
+
   def get_static_libraries(self):
     libs = []
-    path = join(self.dependency_dir, 'lib')
+    if self.root_package:
+      path = join(self.root_package.dependency_dir, 'lib')
+    else:
+      path = join(self.dependency_dir, 'lib')
+
     for dep_name in self.get_dependency_configurations():
-      d = join(self.dependency_dir, dep_name)
-      for root, dirs, filenames in os.walk(d):
-        filenames = [a for a in filenames if a.endswith(".a")]
-        libs.extend([join(root, f) for f in filenames])
+      if dep_name not in self.ignored_deps:
+        d = join(path, dep_name)
+        if os.path.exists(d):
+          for root, dirs, filenames in os.walk(d):
+            filenames = [a for a in filenames if a.endswith(".a")]
+            libs.extend([join(root, f) for f in filenames])
     return libs
 
 
   def get_include_paths(self):
     includes = []
     includes.append(self.include)
+    includes.append(self.private_include)
+
+    if self.root_package:
+      includes.append(join(self.root_package.dependency_dir, 'include'))
+    else:
+      includes.append(join(self.dependency_dir, 'include'))
+    return includes
+
+    includes.append(own_include)
     for dep_dir in os.listdir(self.dependency_dir):
       includes.append(join(self.dependency_dir, dep_dir, 'include'))
     return includes
@@ -306,7 +354,8 @@ class Package(object):
 
   def get_library_paths(self):
     library_paths = []
-    library_paths.append(join(self.dependency_dir, 'lib'))
+    if self.root_package is None:
+      library_patths.append(join(self.root_package.dependency_dir, 'lib'))
     return library_paths
 
   def create_cflags(self):
@@ -314,8 +363,17 @@ class Package(object):
     if 'cflags' in self.config and 'gcc' in self.config['cflags']:
       cflags += self.config['cflags']['gcc'].split() 
 
+    for variant_dict in self.filtered_variants:
+      # We know this is a dict with key == variant_name, value = configuration
+      enabled_variant = list(variant_dict.values())[0]
+      if 'cflags' in enabled_variant and 'gcc' in enabled_variant['cflags']:
+        cflags.append(enabled_variant['cflags']['gcc'])
+
     for path in self.get_include_paths():
       cflags.append('-I' + path)
+
+
+
 
     return cflags
 
@@ -333,10 +391,9 @@ class Package(object):
 
     distutils.dir_util._path_created = {}
     if headers_only:
-      src = join(realpath(join(self.output_dir)), self.name)
-      dest = join(dest, self.name)
-      shutil.rmtree(dest)
-      shutil.copytree(src, dest, ignore = filter_not_headers)
+      src = self.output_dir
+      dest = dest
+      copy_tree(src, dest)
     else:
       copy_tree(src, dest)
 
@@ -384,6 +441,7 @@ class Package(object):
       self.traits['cflags'] += " ".join(extra_flags)
     else:
       self.traits['cflags'] = extra_flags
+
     
   def foreign_build(self):
     build_script = join(self.path, 'build.sh')
@@ -425,6 +483,12 @@ class Package(object):
       yaml.dump(descriptor, f)
 
   def build(self, extra_flags = ''):
+
+    # Copy headers first, so we can add 
+    # output/.../include
+    # To allow a package to include it's own header files
+    # within header files
+    self.copy_headers()
     self.update_traits(extra_flags)
     if 'type' in self.config and self.config['type'] == 'foreign':
       self.form = 'binary'
@@ -435,7 +499,6 @@ class Package(object):
     except CompilationError as e:
       #print (str(e))
       raise e
-    self.copy_headers()
     self.form = 'binary'
 
 
@@ -457,7 +520,8 @@ class Package(object):
       try:
         new_source_names = [f for f in os.listdir(variant_dir) if f.endswith('.c') or f.endswith('.cpp')]
       except OSError:
-        raise PackageError("Directory for variant {0} does not exist".format(variant_name))
+        print (colored("Directory for variant {0} does not exist".format(variant_name), 'red'))
+        new_source_names = []
 
       new_object_names = [self.change_extension(f, '.o') for f in new_source_names]
 
@@ -539,10 +603,12 @@ class Package(object):
       raise Exception("Clyde doesn't know how to build type: {0}".format(self.config['type']))
 
   def __repr__(self):
+    return "{0}-{1}".format(self.name, self.config['version'])
     return "Package('{0}')".format(self.path)
 
   def __hash__(self):
-      h = int(stable_sha(self.config), 16)
+      h = int(stable_sha({'name': self.name, 
+                         }), 16)
       return h
 
   def __eq__(self, other):

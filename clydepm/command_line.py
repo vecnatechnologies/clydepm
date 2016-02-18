@@ -9,12 +9,15 @@ from subprocess import Popen, PIPE
 import pkg_resources
 import configparser
 import getpass
+from clydepm.template import fetch
 
+import sys
 from colorama import init
 from termcolor import colored
 
-init()
+import traceback
 
+init()
 
 def load_config(exec_root):
   """
@@ -75,7 +78,7 @@ def get_gcc_version(compiler_binary):
   return stdout.split()[0]
 
 
-def make_package_descriptor(path, variant = None):
+def make_package_descriptor(path, variant = None, platform = None):
   """
   Make a valid package descriptor for the clyde package located
   at path.
@@ -118,7 +121,9 @@ def make_package_descriptor(path, variant = None):
   if variant:
     traits['variant'] = variant
 
-  
+  if platform:
+    traits['platform'] = platform
+    
   descriptor = {
     'name'        : config['name'],
     'version'     : 'local',
@@ -126,6 +131,7 @@ def make_package_descriptor(path, variant = None):
     'form'        : 'source',
     'traits'      : traits
   }
+  
   return descriptor
 
 
@@ -136,29 +142,46 @@ def is_package(path):
 
 
 
-def make(builder, variant = 'src'):
+def make(builder, variant = 'src', platform = 'linux', show_graph = False):
   project_root = getcwd()
   if not is_package(project_root):
     raise Exception("This isn't a package {0}".format(project_root))
-  descriptor = make_package_descriptor(project_root, variant)
+  descriptor = make_package_descriptor(project_root, variant, platform)
 
   try:
       package = builder.get_package_by_descriptor(descriptor)
-  except CompilationError as e:
+  except Exception as e:
+    print ("Building {0}".format(builder.build_trace[-1]))
+    print ( " -> ".join(builder.build_trace))
+
+    print (builder.all_deps)
+    if show_graph:
+      builder.u.view()
+    traceback.print_exc(file=sys.stdout)
     print (str(e))
+    sys.exit(1)
+  if show_graph:
+    builder.u.view()
   return package
 
 
 def clean(builder):
-  package = make(builder).clean()
+  project_root = getcwd()
+  descriptor = make_package_descriptor(project_root)
+  package = builder.get_package_by_descriptor(descriptor, clean = True)
   print ('cleaning')
   pass
+
+def flush(builder):
+  builder.flush() 
 
 
 def run_binary(binary):
   if os.path.exists(binary):
     args = [binary]
     test_binary = Popen(args, stdout=PIPE, stderr=PIPE)
+    for line in test_binary.stdout:
+        sys.stdout.write(line.decode('ascii'))
     stdout, stderr = test_binary.communicate()
     print("Running test executable")
     print (stdout)
@@ -205,8 +228,37 @@ def main():
   parser_clean    = subparsers.add_parser('clean')
   parser_test     = subparsers.add_parser('test')
   parser_run      = subparsers.add_parser('run')
+  parser_flush    = subparsers.add_parser('flush')
+  parser_fetch    = subparsers.add_parser('fetch')
 
-  parser_init.add_argument('type', type=str, help = 'Type of package (application or library')
+  parser_init.add_argument('type', 
+                           type=str, 
+                           help = 'Type of package (application or library')
+
+  parser_fetch.add_argument('name', 
+                            type=str, 
+                            help = 'Template name to fetch')
+
+  parser_fetch.add_argument('--list', 
+                            action='store_true',
+                            default = False,
+                            help = 'Template name to fetch')
+
+  parser_make.add_argument('--variant', 
+                           type=str, 
+                           default = 'src',
+                           help = 'Variant to build e.g.  test or linux')
+
+  parser_make.add_argument('-g --graph', 
+                           dest= 'graph',
+                           action='store_true',
+                           default = False,
+                           help = 'Print a nice PDF dependency graph')
+
+  parser_make.add_argument('--platform', 
+                           type=str, 
+                           default = 'linux',
+                           help = 'platform to build e.g.  linux, rtems')
 
   commands = {
     'build'    : make,
@@ -215,6 +267,8 @@ def main():
     'config'  : config,
     'init'    : init,
     'run'     : run,
+    'fetch'   : fetch,
+    'flush'   : flush,
   }
   
   namespace = parser.parse_args()
@@ -229,6 +283,17 @@ def main():
 
       if 'type' in namespace:
         commands[command](package_builder, namespace.type)
+
+      elif 'variant' in namespace or 'platform' in namespace:
+        commands[command](package_builder, 
+                          namespace.variant, 
+                          namespace.platform,
+                          namespace.graph)
+      elif command == 'fetch':
+        project_root = getcwd()
+        temp_package = Package(project_root, form = 'source')
+        commands[command](namespace.name, configuration['General'], temp_package.config)
+
       else:
         commands[command](package_builder)
 

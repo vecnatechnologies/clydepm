@@ -17,9 +17,17 @@ options = {
                              'pyyaml', 
                              'colorama', 
                              'termcolor', 
+                             'configparser',
+                             'unidecode',
+                             'graphviz',
+                             'ruamel.yaml',
+                             'Jinja2'
                             ],
     'zip_safe'          :   False,
-    'version'           :   '0.0.17',
+    'package_data'      : {
+        'templates' : ['*']
+    },
+    'version'           :   '0.1.2',
     'test_suite'        :   'nose.collector',
     'tests_require'     :   ['nose'],
     'entry_points'      :   {
