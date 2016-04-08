@@ -12,6 +12,11 @@ from termcolor import colored
 
 from .common import temp_cwd, dict_contains, stable_sha 
 
+from unidecode import unidecode
+
+from clyde2.clyde_logging import get_logger
+logger = get_logger()
+
 class CompilationError(Exception):
 
     def __init__(self, stderr = None):
@@ -19,10 +24,10 @@ class CompilationError(Exception):
         Exception.__init__(self)
 
     def __repr__(self):
-      return u"Compilation Failed\n\n\t" + str(self.stderr.decode("utf-8"))
+      return u"Compilation Failed\n\n\t" + unidecode(self.stderr.encode('utf-8'))
 
     def __str__(self):
-      return "Compilation Error: \n\n" + str(self.stderr.decode('utf-8'))
+      return "Compilation Error: \n\n" + unidecode(self.stderr.decode('utf-8'))
 
 class PackageError(Exception):
 
@@ -57,7 +62,7 @@ class Package(object):
 
   @staticmethod
   def create_new_package(path = None, package_type = 'library', configuration = None):
-    print ("Creating new package")
+    logger.info("Creating new package")
     configs = [join(path, 'config.yaml'), join(path, 'descriptor.yaml')]
     for config in configs:
       if os.path.exists(config):
@@ -82,9 +87,9 @@ class Package(object):
 
     package_config = {
       'name'            : dirname,
-      'author'          : configuration['General']['user.name'],
-      'author-email'    : configuration['General']['user.email'],
-      'cflags'          : {'gcc' : '--std=c99'},
+      'author'          : str(configuration['General']['user.name']),
+      'author-email'    : str(configuration['General']['user.email']),
+      'cflags'          : {'gcc' : '-std=c++11'},
       'version'         : '0.0.0',
       'type'            : package_type,
       'url'             : 'http://example.com'

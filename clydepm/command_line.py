@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 from .package_builder import PackageBuilder
 from .package import Package, CompilationError
+
+from clyde2.package_builder import build_package
+
 import argparse
 from os.path import realpath, join, exists, expanduser
 from os import getcwd
@@ -16,6 +19,9 @@ from colorama import init
 from termcolor import colored
 
 import traceback
+
+import logging
+from clyde2.clyde_logging import init_logging
 
 init()
 
@@ -158,7 +164,7 @@ def make(builder, variant = 'src', platform = 'linux', show_graph = False):
     if show_graph:
       builder.u.view()
     traceback.print_exc(file=sys.stdout)
-    print (str(e))
+    print (unicode(e))
     sys.exit(1)
   if show_graph:
     builder.u.view()
@@ -217,8 +223,7 @@ def version():
 
 def main():
 
-
-
+  init_logging(logging.DEBUG)
   parser = argparse.ArgumentParser()
   parser.add_argument('--version', action='version', version=version())
   subparsers = parser.add_subparsers(title = 'Commands', dest='command')
@@ -237,6 +242,7 @@ def main():
 
   parser_fetch.add_argument('name', 
                             type=str, 
+                            nargs="?",
                             help = 'Template name to fetch')
 
   parser_fetch.add_argument('--list', 
@@ -292,7 +298,8 @@ def main():
       elif command == 'fetch':
         project_root = getcwd()
         temp_package = Package(project_root, form = 'source')
-        commands[command](namespace.name, configuration['General'], temp_package.config)
+        commands[command](namespace.name, configuration['General'],
+                          temp_package.config, namespace.list)
 
       else:
         commands[command](package_builder)
