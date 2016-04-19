@@ -3,7 +3,7 @@ import logging
 def init_logging(level = logging.ERROR):
   # create logger with 'spam_application'
   logger = logging.getLogger('clyde2')
-  logger.setLevel(logging.DEBUG)
+  logger.setLevel(logging.INFO)
   # create file handler which logs even debug messages
   fh = logging.FileHandler('clyde2.log')
   fh.setLevel(logging.DEBUG)

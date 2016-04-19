@@ -38,6 +38,7 @@ flags = [
     'c++',
     '-std=C++14',
     '-I./include',
+    '-I./prefix/include',
     '-I./dependencies/include',
     '-I/usr/include',
     '-std=gnu++11',
@@ -140,4 +141,3 @@ def FlagsForFile( filename, **kwargs ):
     'flags': final_flags,
     'do_cache': True
   }
-

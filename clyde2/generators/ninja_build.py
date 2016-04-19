@@ -8,11 +8,16 @@ from clyde2.common import pprint_color, dict_contains
 
 from clyde2.rtems import *
 
+# Tools to walk over the tree collecting includes
+import functools
+from clyde2.resolver import walk_tree, gather_library_names
+
 def generate_toolset(writer, 
                      prefix = '', 
                      toolchain = None, 
                      rtems_makefile_path = None):
   cflags = ' -DSTM32F7_DISCOVERY'
+  cflags = ''
   if rtems_makefile_path:
     flags = get_flags_dict(rtems_makefile_path)
     flags['cflags'] += cflags
@@ -34,9 +39,9 @@ def generate_toolset(writer,
   if not toolchain:
 
     toolchain = {
-      'cc'      : prefix + 'gcc -MMD -MF $out.d {0} $cflags -c $in -o $out'.format(cflags),
-      'cpp'     : prefix + 'g++ -MMD -MF $out.d {0} $cflags -c $in -o $out'.format(cflags),
-      'main'    : prefix + 'g++ -MMD -MF $out.d $cflags $in -o $out',
+      'cc'      : prefix + 'gcc -MMD -MF $inc $out.d {0} $cflags -c $in -o $out'.format(cflags),
+      'cpp'     : prefix + 'g++ -MMD -MF $inc $out.d {0} $cflags -c $in -o $out'.format(cflags),
+      'main'    : prefix + 'g++ -MMD -MF $inc $out.d $cflags $in -o $out',
       'as'      : prefix + 'as',
       'ar'      : prefix + 'ar',
       'ranlib'  : prefix + 'ranlib',
@@ -79,12 +84,8 @@ def build_location(file, root):
 
 def make_cflags(name, info, root):
   out = []
-  for include in info['include']:
-    #out.append('-I' + build_location(include, root))
-    out.append('-I' + include) 
-
   out.append(info['cflags'])
-  out.append('-I' + join('deps', name, 'include'))
+  out.append('-I' + join('prefix', 'include'))
   return " ".join(out)
 
 
@@ -97,7 +98,12 @@ def generate_library_entries(w, node, info, root, top = False):
     return
   else:
     generated.add(info['name'])
-  
+
+  if top:  
+    w.build(outputs = 'prefix/include/' + node,
+            rule = 'symlink',
+            inputs = 'include/' + node)
+
   w.newline()
   w.comment("Library {0} sources".format(node))
   # Handle all the source files in this package
@@ -135,14 +141,23 @@ def generate_library_entries(w, node, info, root, top = False):
       libs.append(libname)
       linked.add(libname)
 
+  # This next few lines determines how to perform the 
+  # the final link, either creating a static library or 
+  # binary, depending on the type of the package.
   if info['type'] == 'library':
     tool = 'link'
+    output = 'prefix/lib/' + node + '.a'
   elif info['type'] == 'application':
     tool = 'main'
+    if 'variant' in info and info['variant'] == 'test':
+      output = 'prefix/bin/test-' + node
+    else:
+      output = 'prefix/bin/' + node
   else:
     raise Exception("Error in clyde config: type is not library or application")
 
-  w.build(outputs = 'prefix/lib/' + node + '.a', 
+
+  w.build(outputs = output,
           rule = tool, variables = vars,
           inputs = ['prefix/lib/' + l for l in libs] + objects
          )
@@ -164,6 +179,9 @@ def generate_file(tree, prefix = '',
                   root = None, 
                   cflags = None,
                   rtems_makefile_path = None):
+  libraries = set()
+  walk_tree(tree, functools.partial(gather_library_names, libraries))
+
   output = StringIO.StringIO()
   w = Writer(output)
 
@@ -171,7 +189,12 @@ def generate_file(tree, prefix = '',
                    toolchain = toolchain,
                    rtems_makefile_path = rtems_makefile_path)
   w.newline( )
-  w.comment("Global flags")
+  w.comment("Magic symlinks to make include paths way cleaner")
+  w.newline()
+  for libname in libraries:
+      w.build(outputs = 'prefix/include/' + libname,
+              rule = 'symlink',
+              inputs = join('deps', libname, 'include', libname))
 
   for node, info in tree.iteritems():
     
@@ -185,4 +208,4 @@ def generate_file(tree, prefix = '',
 
 
 #TODO 
-# Fix problem where symlinks are not required by any other target
+# Fix problem where nja depend on directorysymlinks are not required by any other target

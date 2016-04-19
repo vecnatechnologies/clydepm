@@ -1,6 +1,6 @@
 from semantic_version import Version, Spec
 from clyde2.common import pprint_color, dict_contains
-from os.path import join
+from os.path import join, abspath, relpath
 import functools
 def insert_dependency(candidates, new_dependency, server): 
   pass
@@ -48,6 +48,17 @@ def replace_by_name(candidates, new_candidate):
     candidates.remove(to_delete)
   candidates.add(new_candidate)
       
+def get_frozen_packages(frozen_packages, server, traits):
+  output = set()
+  for name, version in frozen_packages.iteritems():
+    spec = Spec('==' + version)
+    
+    best  = server.best(name,  spec, traits, False)
+    if not best:
+      raise Exception("Could not satisfy {0} Version {1}".format(name, spec))
+    output.add(best)
+  return output
+
 
 def resolve_package_dependencies(root_package, server, traits, fetch_remote):
   pass
@@ -73,13 +84,14 @@ def resolve_package_dependencies(root_package, server, traits, fetch_remote):
 def insert_per_dependency_include(libinfo):
   if 'libraries' in libinfo:
     for depname, depinfo in libinfo['libraries'].iteritems():
-      libinfo['include'].add(join('deps', depname, 'include'))
-    libinfo['include'].add(join('deps', libinfo['name'], 'include'))
+      pass 
+      #libinfo['include'].add(join('deps', depname, 'include'))
+    #libinfo['include'].add(join('deps', libinfo['name'], 'include'))
 
 def add_includes_for_libraries(library, depth):
   if depth == 0:
     if 'variant' in library and 'platform' in library:
-      if library['variant'] == 'test'  and library['platform'] == 'linux':
+      if library['variant'] == 'test':
         library['type'] = 'application'
   insert_per_dependency_include(library)
 
@@ -89,10 +101,15 @@ def gather_include_paths(libraries, library, depth):
     libraries |= library['include']
 
 
+def gather_library_names(libraries, library, depth):
+  if 'name' in library and depth != 0:
+    libraries.add(library['name'])
+
+
 def insert_dependencies(libraries, library, depth):
   # All libraries should include all other ones?
   if 'include' in library:
-    library['include'] |= libraries
+    library['include'] |= set(map(abspath, libraries))
 
     
 def walk_tree(tree, visitor, depth = 0):
@@ -103,9 +120,26 @@ def walk_tree(tree, visitor, depth = 0):
       walk_tree({libname: libinfo}, visitor, depth + 1)
 
 
-def create_build_tree(package, top = True):
+def create_build_tree(package, top = True, visited = None):
+  if not visited:
+    visited = set()
+
   name = package.name
-  libraries = map(lambda a: create_build_tree(a, False), package.get_inflated_dependencies())
+
+  visited.add(name)
+
+  deps = package.get_inflated_dependencies()
+
+  def is_not_visited(dep):
+    if dep.name in visited:
+      return False
+    else:
+      return True
+
+  deps = filter(is_not_visited, deps)
+
+
+  libraries = map(lambda a: create_build_tree(a, False, visited), deps)
 
   new_libraries = {}
   for lib in libraries:

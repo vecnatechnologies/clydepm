@@ -64,3 +64,6 @@ docs/docs
 
 # PyBuilder
 target/
+prefix
+.ninja_log
+deps

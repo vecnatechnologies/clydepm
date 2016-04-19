@@ -2,9 +2,11 @@ import yaml
 from os.path import realpath, join, splitext, isfile, relpath
 from os import listdir
 from semantic_version import Version, Spec
-from .common import listdir_fullpath, dict_contains
+from .common import listdir_fullpath, dict_contains, fail
 import os
 
+from clyde2.clyde_logging import get_logger
+logger = get_logger()
 
 valid_source_extensions = ['.cpp', '.c', '.cc', '.c++']
 valid_header_extensions = ['.h', '.hpp']
@@ -58,7 +60,7 @@ class ClydePackage(object):
       if name in dependencies:
         self.inflated_deps.add(dependencies[name])
       else:
-        raise Exception("Could not inflate {0}".format(name))
+        raise fail("Could not inflate {0}".format(name))
 
 
 
@@ -109,6 +111,8 @@ class ClydePackage(object):
 
   def get_source_files(self, rel = None):
     files = []
+    if 'variant' in self.traits and self.traits['variant'] == 'test':
+      pass
     for variant in self.resolve_variants():
       variant = variant.keys()[0]
       files.extend( self.get_files_in_dir(variant, valid_source_extensions))
@@ -177,7 +181,7 @@ class ClydePackage(object):
         
       }) 
     except AttributeError as e:
-      raise PackageError("Variants should be specified as a list. \n"
+      raise Exception("Variants should be specified as a list. \n"
                      "Hint: Try putting a - character before each variant")
 
 
@@ -256,6 +260,43 @@ class ClydePackage(object):
   def __eq__(self, other):
     return self.name == other.name and self.version == other.version
 
+  @staticmethod
+  def create_new_package(path = None, package_type = 'library', configuration = None):
+    logger.info("Creating new package")
+    configs = [join(path, 'config.yaml'), join(path, 'descriptor.yaml')]
+    for config in configs:
+      if os.path.exists(config):
+        fail("Package already exists at {0}".format(path))
+    # Create initial directory structure and config.yaml
+    # For now, just do it manually
+    # TODO: Make class for handling directory structures that plays well
+    # with package variants
+
+    dirname = os.path.split(path)[1]
+
+    directories = ['src',
+                   join('include', dirname),
+                  ]
+    directories = [join(path, d) for d in directories]
+
+    for dir in directories:
+      if not os.path.exists(dir):
+        os.makedirs(dir)
+
+
+
+    package_config = {
+      'name'            : dirname,
+      'author'          : str(configuration['General']['user.name']),
+      'author-email'    : str(configuration['General']['user.email']),
+      'cflags'          : {'gcc' : '-std=c++11'},
+      'version'         : '0.0.0',
+      'type'            : package_type,
+      'url'             : 'http://example.com'
+    
+    }
+    with open('config.yaml', 'w') as f:
+      f.write(yaml.dump(package_config))
 
 
 class TestPackage():

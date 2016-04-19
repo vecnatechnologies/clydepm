@@ -83,7 +83,6 @@ class Package(object):
         os.makedirs(dir)
 
 
-    dirname = os.path.split(path)[1]
 
     package_config = {
       'name'            : dirname,
@@ -154,10 +153,11 @@ class Package(object):
     self.output_dirs = {}
 
     self.evaluate_config_sugar()
-    self.create_build_directories()
+    #self.create_build_directories()
 
     if not os.path.exists(self.dependency_dir):
-      os.mkdir(self.dependency_dir)
+      pass
+      #os.mkdir(self.dependency_dir)
   
   def get_archive_dir(self):
     return self.archive_dir

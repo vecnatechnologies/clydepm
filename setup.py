@@ -28,7 +28,7 @@ options = {
                                         ],
     'zip_safe'                      :   True,
     'package_data'                  :   {'clydepm': ['templates/*.*'] },
-    'version'                       :   '0.2.38',
+    'version'                       :   '0.2.46',
     'test_suite'                    :   'nose.collector',
     'tests_require'                 :   ['nose'],
     'entry_points'                  :   {

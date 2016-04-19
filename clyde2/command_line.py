@@ -11,9 +11,11 @@ from os.path import join
 from termcolor import colored
 import traceback
 
-from clydepm.package import Package
+from clyde2.package import ClydePackage
 from clyde2.clyde_logging import get_logger, init_logging
 import logging
+
+from clydepm.config import load_config
 
 def version():
   version = pkg_resources.require("clydepm")[0].version 
@@ -42,7 +44,11 @@ def generate_build_file(path, namespace):
     if 'rtems' in namespace:
       options['rtems'] = namespace.rtems
     
-    build_file_contents, tree  = build_package(path, options, fetch_remote = not namespace.fast)
+    build_file_contents, tree  = build_package(path,
+                                               traits = options, 
+                                               fetch_remote = not
+                                               namespace.fast,
+                                               frozen = namespace.frozen)
     #build_package(path, options)
     with open(join(path, 'build.ninja'), 'w') as f:
       print(colored("Wrote configuration file build.ninja", 'green'))
@@ -55,6 +61,10 @@ def generate_build_file(path, namespace):
     if (namespace.verbose):
         traceback.print_exc(e)
 
+def init(path, namespace):
+  configuration = load_config(os.getcwd())
+  ClydePackage.create_new_package(path, namespace.type, configuration)
+
 def main():
 
   init_logging(logging.DEBUG)
@@ -62,8 +72,15 @@ def main():
   parser.add_argument('--version', action='version', version=version())
   subparsers = parser.add_subparsers(title = 'Commands', dest='command')
 
-  parser_gen = subparsers.add_parser('gen')
+  parser_gen  = subparsers.add_parser('gen')
+  parser_init = subparsers.add_parser('init')
+
   logger = get_logger()
+    
+
+  parser_init.add_argument('type', 
+                           type=str, 
+                           help = 'Type of package (application or library')
 
 
   parser_gen.add_argument('--variant', 
@@ -86,6 +103,11 @@ def main():
                          default = False,
                          help = "Update dependencies without fetching remote tags ")
 
+  parser_gen.add_argument("--frozen",
+                         action="store_true",
+                         default = False,
+                         help = "Use the frozen dependencies in versions.txt")
+
   parser_gen.add_argument('--platform', 
                            type=str, 
                            default = 'linux',
@@ -93,6 +115,7 @@ def main():
 
   commands = {
     'gen'    : generate_build_file,
+    'init'   : init
   }
   
   namespace = parser.parse_args()
@@ -100,8 +123,6 @@ def main():
   if 'command' in namespace:
     command = namespace.command
     if command in commands:
-
-
       path = os.getcwd()
       commands[command](path, namespace)
 

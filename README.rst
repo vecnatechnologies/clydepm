@@ -20,7 +20,7 @@ Here is an example descriptor, notated in yaml::
     traits: {cflags: ' -O2', compiler: gcc, compiler-version: 4.8.4}
     version: v3.7.1
 
-The describes a package that has been compiled by gcc 4.8.4 with the flags -O2, version v3.71.
+The describes a package that has been compiled by gcc 4.8.4 with the flags -O2, version v3.7.1.
 
 These attributes uniquely identify this package so it can be saved, and later retrieved using these parameters.
 
@@ -37,10 +37,12 @@ Basic Hello World
 
     mkdir my-application
     cd my-package
+
 2. Initialize a new clyde application project::
 
     clyde init application
-3. Notice the created directory structure. There is now a src, include, private_include and config.yaml
+
+3. Notice the created directory structure. There is now a src, include and config.yaml
 
 4. Make a new c file src/hello.c, for example::
 
@@ -57,7 +59,7 @@ Basic Hello World
     clyde make
 
     Try running it
-    clyde run
+    clyde build
     # You can also manually run the file 
     ./output/my-application/my-application-0.0.1.out (Exact name may vary) 
 
@@ -99,14 +101,15 @@ Let's discuss directory structure for a second. Let's say you put the previous e
 
 5. Try compiling it::
 
-    clyde make
+    clyde build
 
 
 6. Let's set this up as a dependency for my-application. Edit config.yaml to include a dependency. It should look something like this::
     
         author: Isaac Gutekunst
         author-email: isaac.gutekunst@vecna.com
-        cflags: {gcc: --std=c99} desc: |
+        cflags: {gcc: --std=c99} 
+        desc: |
             This package demonstrates the basic features of the clyde package manager.
             It now supports printing text generated from a static library that is
             automatically linked
@@ -114,7 +117,7 @@ Let's discuss directory structure for a second. Let's say you put the previous e
         type: application
         url: http://wiki.vecna.com
         version: 0.0.1
-        dependencies:
+        requires:
             a:
                 version: local
                 local-path: ../my-library

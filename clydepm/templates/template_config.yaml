@@ -30,12 +30,13 @@ templates:
         include:
             - cpputest-empty.cpp: {as: test.cpp}
  
-    - default:
-        description: Template package group
+    - quickstart:
+        description: Basic clyde package template
         meta-include:
             - docs
             - gitignore
             - ycm
+            - hello
     
     - hello:
         description: Basic clyde hello project
@@ -57,5 +58,13 @@ templates:
         directory: src
         include:
             - rtems_entry_stm32f4.cpp
+
+    - rtems-quickstart:
+        description: RTEMS Top level project with a all files needed to get going fast
+        meta-include:
+          - docs
+          - gitignore
+          - ycm
+          - rtems-init
 
 
