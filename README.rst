@@ -399,21 +399,11 @@ At the time of this writing, template_config.yaml contained the following config
 
 Issues and Improvements
 =======================
-
-* Understand dependencies for already built/versioned packages
-* Build Avoidance for local packages
-* Make version master behave better
-* If a package is cloned from git, but is broken/empty/missing config.yaml, the message is cryptic
-* Per variant include files. Or replace: somehow replaces header file
-* Per variant CFLAGS. Useful for selective including, or configuration
-* Clean actually works
-* Bug: Having same named files in two variants causes problems
-* Major: Create nicely formatted makefiles
-* Major: create json compile database for tools
-* Major: Create .ycm_extra.conf (maybe unnecessary if compilation database is available
-* Auto generation of various  skeletons (docs, gitignore)
-* Think about how variant=test propagates through packages
-* Ability to run tests on real hardware (clyde test --variant rtems might do something special. Maybe there should be per project test runners)
+* Supporting variou backends besides gerrit
+* Friendly defaults and configuration options
+* More generic concept of platforms
+* Merge clyde clyde2 and properly deprecate clyde
+* Ability to run tests on real hardware (clyde test --variant rtems might do something specil)
 
 
 
