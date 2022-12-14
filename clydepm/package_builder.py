@@ -97,7 +97,26 @@ class PackageBuilder(object):
       sha = os.path.split(tarball_path.replace('.tar.gz', ''))[1]
       path = join(self.package_directory, sha) 
       with tarfile.open(tarball_path) as tar:
-        tar.extractall(self.package_directory)
+        def is_within_directory(directory, target):
+            
+            abs_directory = os.path.abspath(directory)
+            abs_target = os.path.abspath(target)
+        
+            prefix = os.path.commonprefix([abs_directory, abs_target])
+            
+            return prefix == abs_directory
+        
+        def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+        
+            for member in tar.getmembers():
+                member_path = os.path.join(path, member.name)
+                if not is_within_directory(path, member_path):
+                    raise Exception("Attempted Path Traversal in Tar File")
+        
+            tar.extractall(path, members, numeric_owner=numeric_owner) 
+            
+        
+        safe_extract(tar, self.package_directory)
     else:
       raise Exception("store_tarball not passed .tar.gz file")
 
